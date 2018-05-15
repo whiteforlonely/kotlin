@@ -81,7 +81,7 @@ public abstract class CodegenTestCase extends KtUsefulTestCase {
     private static final String DEFAULT_TEST_FILE_NAME = "a_test";
     private static final String DEFAULT_JVM_TARGET_FOR_TEST = "kotlin.test.default.jvm.target";
     private static final String JAVA_COMPILATION_TARGET = "kotlin.test.java.compilation.target";
-    public static final String RUN_BOX_TEST_IN_SEPARATE_PROCESS_PORT = "kotlin.test.box.in.separate.process.port";
+    private static final String RUN_BOX_TEST_IN_SEPARATE_PROCESS_PORT = "kotlin.test.box.in.separate.process.port";
 
     protected KotlinCoreEnvironment myEnvironment;
     protected CodegenTestFiles myFiles;
@@ -92,9 +92,22 @@ public abstract class CodegenTestCase extends KtUsefulTestCase {
     protected String coroutinesPackage;
 
     protected ConfigurationKind configurationKind = ConfigurationKind.JDK_ONLY;
-    private final String defaultJvmTarget = System.getProperty(DEFAULT_JVM_TARGET_FOR_TEST);
+    private final JvmTarget defaultJvmTarget;
     private final String boxInSeparateProcessPort = System.getProperty(RUN_BOX_TEST_IN_SEPARATE_PROCESS_PORT);
     private final String javaCompilationTarget = System.getProperty(JAVA_COMPILATION_TARGET);
+
+    @SuppressWarnings("JUnitTestCaseWithNonTrivialConstructors")
+    protected CodegenTestCase() {
+        String defaultJvmTarget = System.getProperty(DEFAULT_JVM_TARGET_FOR_TEST);
+        if (defaultJvmTarget != null) {
+            JvmTarget value = JvmTarget.fromString(defaultJvmTarget);
+            assert value != null : "Can't construct JvmTarget for " + defaultJvmTarget;
+            this.defaultJvmTarget = value;
+        }
+        else {
+            this.defaultJvmTarget = null;
+        }
+    }
 
     protected final void createEnvironmentWithMockJdkAndIdeaAnnotations(
             @NotNull ConfigurationKind configurationKind,
@@ -637,16 +650,16 @@ public abstract class CodegenTestCase extends KtUsefulTestCase {
 
     }
 
-    protected void setCustomDefaultJvmTarget(CompilerConfiguration configuration) {
-        JvmTarget target = configuration.get(JVMConfigurationKeys.JVM_TARGET);
-        if (target == null && defaultJvmTarget != null) {
-            JvmTarget value = JvmTarget.fromString(defaultJvmTarget);
-            assert value != null : "Can't construct JvmTarget for " + defaultJvmTarget;
-            configuration.put(JVMConfigurationKeys.JVM_TARGET, value);
+    private void setCustomDefaultJvmTarget(CompilerConfiguration configuration) {
+        if (configuration.get(JVMConfigurationKeys.JVM_TARGET) == null && defaultJvmTarget != null) {
+            configuration.put(JVMConfigurationKeys.JVM_TARGET, defaultJvmTarget);
         }
     }
 
-    protected void compile(
+    /**
+     * @return false if the test should be skipped (for example, if an inconsistent combination of JDK and JVM target versions is used)
+     */
+    protected boolean compile(
             @NotNull List<TestFile> files,
             @Nullable File javaSourceDir
     ) {
@@ -669,6 +682,16 @@ public abstract class CodegenTestCase extends KtUsefulTestCase {
                 ArraysKt.filterNotNull(new File[] {javaSourceDir}),
                 files
         );
+
+        if (defaultJvmTarget != null &&
+            configuration.get(JVMConfigurationKeys.JVM_TARGET, JvmTarget.DEFAULT).compareTo(defaultJvmTarget) > 0) {
+            return false;
+        }
+
+        if (defaultJvmTarget == JvmTarget.JVM_1_6 &&
+            files.stream().anyMatch(it -> InTextDirectivesUtils.isDirectiveDefined(it.content, "SKIP_JDK6"))) {
+            return false;
+        }
 
         myEnvironment = KotlinCoreEnvironment.createForTests(
                 getTestRootDisposable(), configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES
@@ -708,6 +731,8 @@ public abstract class CodegenTestCase extends KtUsefulTestCase {
                     findJavaSourcesInDirectory(javaSourceDir), javaClasspath, javacOptions
             );
         }
+
+        return true;
     }
 
 

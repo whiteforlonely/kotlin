@@ -8,6 +8,7 @@ public class F {
 }
 
 // FILE: test.kt
+// TARGET_BACKEND: JVM
 // WITH_RUNTIME
 // FULL_JDK
 fun test(f: (Int?) -> String): String {

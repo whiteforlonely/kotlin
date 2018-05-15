@@ -1,3 +1,4 @@
+// TARGET_BACKEND: JVM
 // WITH_RUNTIME
 // COMMON_COROUTINES_TEST
 // FULL_JDK
@@ -7,42 +8,45 @@ import java.util.concurrent.CompletableFuture
 import COROUTINES_PACKAGE.*
 import COROUTINES_PACKAGE.intrinsics.*
 
+fun foo(): CompletableFuture<String> = CompletableFuture.supplyAsync { "foo" }
+fun bar(v: String): CompletableFuture<String> = CompletableFuture.supplyAsync { "bar with $v" }
 fun exception(v: String): CompletableFuture<String> = CompletableFuture.supplyAsync { throw RuntimeException(v) }
 
 fun foobar(x: String, y: String) = x + y
 
 fun box(): String {
     var result = ""
-
-    val future = async<String>() {
-        try {
-            await(exception("OK"))
-        } catch (e: Exception) {
-            result = e.cause?.message!!
-        }
-        "56"
+    fun log(x: String) {
+        if (result.isNotEmpty()) result += "\n"
+        result += x
     }
 
-    future.join()
-
-    if (future.get() != "56") return "fail: ${future.get()}"
-
-    if (result != "OK") return "fail notOk"
-
-    val future2 = async<String>() {
-        await(exception("OK"))
-        "fail"
+    val future = async<String> {
+        log("start")
+        val x = await(foo())
+        log("got '$x'")
+        val y = foobar("123 ", await(bar(x)))
+        log("got '$y' after '$x'")
+        y
     }
 
-    try {
-        future2.get()
-    } catch (e: Exception) {
-        if (e.cause!!.message != "OK") return "fail message: ${e.cause!!.message}"
-        return "OK"
-    }
+    future.whenComplete { value, t ->
+        log("completed with '$value'")
+    }.join()
 
-    return "No exception"
+    val expectedResult =
+    """
+    |start
+    |got 'foo'
+    |got '123 bar with foo' after 'foo'
+    |completed with '123 bar with foo'""".trimMargin().trim('\n', ' ')
+
+    if (expectedResult != result) return result
+
+    return "OK"
 }
+
+// LIBRARY CODE
 
 fun <T> async(c: suspend () -> T): CompletableFuture<T> {
     val future = CompletableFuture<T>()

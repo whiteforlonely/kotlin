@@ -34,7 +34,9 @@ public abstract class AbstractBlackBoxCodegenTest extends CodegenTestCase {
         @Nullable File javaFilesDir
     ) throws Exception {
         try {
-            compile(files, javaFilesDir);
+            if (!compile(files, javaFilesDir)) {
+                return;
+            }
             blackBox();
         }
         catch (Throwable t) {
