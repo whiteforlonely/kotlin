@@ -234,7 +234,7 @@ private fun getExplicitOutputPath(moduleNode: DataNode<ModuleData>, platformKind
     return K2JSCompilerArguments().apply { parseCommandLineArguments(k2jsArgumentList, this) }.outputFile
 }
 
-private fun adjustClasspath(kotlinFacet: KotlinFacet, dependencyClasspath: List<String>) {
+internal fun adjustClasspath(kotlinFacet: KotlinFacet, dependencyClasspath: List<String>) {
     if (dependencyClasspath.isEmpty()) return
     val arguments = kotlinFacet.configuration.settings.compilerArguments as? K2JVMCompilerArguments ?: return
     val fullClasspath = arguments.classpath?.split(File.pathSeparator) ?: emptyList()
@@ -245,7 +245,7 @@ private fun adjustClasspath(kotlinFacet: KotlinFacet, dependencyClasspath: List<
 
 private val gradlePropertyFiles = listOf("local.properties", "gradle.properties")
 
-private fun findKotlinCoroutinesProperty(project: Project): String {
+internal fun findKotlinCoroutinesProperty(project: Project): String {
     for (propertyFileName in gradlePropertyFiles) {
         val propertyFile = project.baseDir.findChild(propertyFileName) ?: continue
         val properties = Properties()

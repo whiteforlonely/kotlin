@@ -196,6 +196,8 @@ class KotlinFacetSettings {
 
     var productionOutputPath: String? = null
     var testOutputPath: String? = null
+
+    var sourceSetNames: List<String> = emptyList()
 }
 
 fun TargetPlatformKind<*>.createCompilerArguments(init: CommonCompilerArguments.() -> Unit = {}): CommonCompilerArguments {

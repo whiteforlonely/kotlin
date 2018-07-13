@@ -23,12 +23,14 @@ import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.KProperty1
 import kotlin.reflect.KVisibility
 import kotlin.reflect.full.declaredMemberProperties
-import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.memberProperties
 
 @Suppress("UNCHECKED_CAST")
-fun <T : Any> copyBean(bean: T) =
-        copyProperties(bean, bean::class.java.newInstance()!!, true, collectProperties(bean::class as KClass<T>, false))
+fun <T : Any> copyBean(bean: T) = copyBeanTo(bean, bean::class.java.newInstance()!!)
+
+@Suppress("UNCHECKED_CAST")
+fun <T : Any> copyBeanTo(from: T, to: T) =
+    copyProperties(from, to, true, collectProperties(from::class as KClass<T>, false))
 
 fun <From : Any, To : From> mergeBeans(from: From, to: To): To {
     // TODO: rewrite when updated version of com.intellij.util.xmlb is available on TeamCity

@@ -111,6 +111,10 @@ private fun readV2AndLaterConfig(element: Element): KotlinFacetSettings {
                 listOfNotNull((it.content.firstOrNull() as? Text)?.textTrim)
             }
         }
+        element.getChild("sourceSets")?.let {
+            val items = it.getChildren("sourceSet")
+            sourceSetNames = items.mapNotNull { (it.content.firstOrNull() as? Text)?.textTrim }
+        }
         element.getChild("compilerSettings")?.let {
             compilerSettings = CompilerSettings()
             XmlSerializer.deserializeInto(compilerSettings!!, it)
@@ -257,6 +261,13 @@ private fun KotlinFacetSettings.writeLatestConfig(element: Element) {
                         implementedModuleNames.map { addContent(Element("implement").apply { addContent(it) }) }
                     }
                 }
+        )
+    }
+    if (sourceSetNames.isNotEmpty()) {
+        element.addContent(
+            Element("sourceSets").apply {
+                sourceSetNames.map { addContent(Element("sourceSet").apply { addContent(it) }) }
+            }
         )
     }
     productionOutputPath?.let {
