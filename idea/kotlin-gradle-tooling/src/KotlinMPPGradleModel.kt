@@ -12,6 +12,7 @@ import java.io.Serializable
 typealias KotlinDependency = ExternalDependency
 
 interface KotlinModule : Serializable {
+    val isAndroid: Boolean
     val name: String
     val platform: KotlinPlatform
     val dependencies: Set<KotlinDependency>
@@ -62,11 +63,12 @@ interface KotlinTargetJar : Serializable {
 }
 
 interface KotlinTarget : Serializable {
+    val isAndroid: Boolean
     val name: String
-    val disambiguationClassifier: String
+    val disambiguationClassifier: String?
     val platform: KotlinPlatform
     val compilations: Collection<KotlinCompilation>
-    val jar: KotlinTargetJar
+    val jar: KotlinTargetJar?
 }
 
 interface ExtraFeatures : Serializable {

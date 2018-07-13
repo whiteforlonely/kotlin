@@ -33,13 +33,11 @@ class KotlinTargetDataService : AbstractProjectDataService<KotlinTargetData, Voi
             artifactModel.addArtifact(artifactName, JarArtifactType.getInstance()).also {
                 it.outputPath = archiveFile.parent
                 for (moduleId in targetData.moduleIds) {
-                    val moduleDataToPackage = nodeToImport
-                        .parent
-                        ?.children
-                        ?.firstOrNull { (it.data as? KotlinSourceSetData)?.id == moduleId }
-                        ?.data as? KotlinSourceSetData ?: continue
-                    if (moduleDataToPackage.isTestModule) continue
-                    val moduleToPackage = modelsProvider.findIdeModule(moduleDataToPackage) ?: continue
+                    val compilationModuleDataNode = nodeToImport.parent?.findChildModuleById(moduleId) ?: continue
+                    val compilationData = compilationModuleDataNode.data ?: continue
+                    val kotlinSourceSet = compilationModuleDataNode.kotlinSourceSet ?: continue
+                    if (kotlinSourceSet.isTestModule) continue
+                    val moduleToPackage = modelsProvider.findIdeModule(compilationData) ?: continue
                     it.rootElement.addOrFindChild(ProductionModuleOutputPackagingElement(project, moduleToPackage.createPointer()))
                 }
             }

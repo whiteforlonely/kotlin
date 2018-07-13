@@ -8,6 +8,10 @@ package org.jetbrains.kotlin.idea.configuration
 import com.intellij.openapi.externalSystem.model.DataNode
 import com.intellij.openapi.externalSystem.model.project.ModuleData
 
-fun DataNode<*>.findChildModuleById(id: String) = children.firstOrNull { (it.data as? ModuleData)?.id == id }
+@Suppress("UNCHECKED_CAST")
+fun DataNode<*>.findChildModuleById(id: String) =
+    children.firstOrNull { (it.data as? ModuleData)?.id == id } as? DataNode<out ModuleData>
 
-fun DataNode<*>.findChildModuleByInternalName(name: String) = children.firstOrNull { (it.data as? ModuleData)?.internalName == name }
+@Suppress("UNCHECKED_CAST")
+fun DataNode<*>.findChildModuleByInternalName(name: String) =
+    children.firstOrNull { (it.data as? ModuleData)?.internalName == name }

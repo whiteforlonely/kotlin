@@ -12,14 +12,19 @@ class KotlinSourceSetImpl(
     override val sourceDirs: Set<File>,
     override val resourceDirs: Set<File>
 ) : KotlinSourceSet {
-    override lateinit var platform: KotlinPlatform
+    override var isAndroid: Boolean = false
         internal set
 
-    override lateinit var dependencies: Set<KotlinDependency>
+    override var platform: KotlinPlatform = KotlinPlatform.COMMON
+        internal set
+
+    override var dependencies: Set<KotlinDependency> = emptySet()
         internal set
 
     override var isTestModule: Boolean = false
         internal set
+
+    override fun toString() = name
 }
 
 class KotlinCompilationOutputImpl(
@@ -34,6 +39,7 @@ class KotlinCompilationArgumentsImpl(
 ) : KotlinCompilationArguments
 
 class KotlinCompilationImpl(
+    override val isAndroid: Boolean,
     override val name: String,
     override val sourceSets: Collection<KotlinSourceSet>,
     override val dependencies: Set<KotlinDependency>,
@@ -49,6 +55,8 @@ class KotlinCompilationImpl(
 
     override val isTestModule: Boolean
         get() = name == KotlinCompilation.TEST_COMPILATION_NAME
+
+    override fun toString() = name
 }
 
 class KotlinTargetJarImpl(
@@ -56,12 +64,15 @@ class KotlinTargetJarImpl(
 ) : KotlinTargetJar
 
 class KotlinTargetImpl(
+    override val isAndroid: Boolean,
     override val name: String,
-    override val disambiguationClassifier: String,
+    override val disambiguationClassifier: String?,
     override val platform: KotlinPlatform,
     override val compilations: Collection<KotlinCompilation>,
-    override val jar: KotlinTargetJar
-) : KotlinTarget
+    override val jar: KotlinTargetJar?
+) : KotlinTarget {
+    override fun toString() = name
+}
 
 class ExtraFeaturesImpl(
     override val coroutinesState: String?

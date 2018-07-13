@@ -50,9 +50,10 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
                 nodeToImport,
                 ProjectKeys.MODULE
             ) ?: continue
-            val sourceSetData = nodeToImport.data as? KotlinSourceSetData ?: continue
+            val sourceSetData = nodeToImport.data
+            val kotlinSourceSet = nodeToImport.kotlinSourceSet ?: continue
             val ideModule = modelsProvider.findIdeModule(sourceSetData) ?: continue
-            val platform = sourceSetData.platform
+            val platform = kotlinSourceSet.platform
             val rootModel = modelsProvider.getModifiableRootModel(ideModule)
 
             dropWrongLibraries(rootModel, platform, project)
@@ -61,12 +62,13 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
                 migrateNonJvmSourceFolders(rootModel)
             }
 
-            configureFacet(sourceSetData, mainModuleData, ideModule, modelsProvider)
+            configureFacet(sourceSetData, kotlinSourceSet, mainModuleData, ideModule, modelsProvider)
         }
     }
 
     private fun configureFacet(
-        sourceSetData: KotlinSourceSetData,
+        sourceSetData: GradleSourceSetData,
+        kotlinSourceSet: KotlinSourceSetInfo,
         mainModuleNode: DataNode<ModuleData>,
         ideModule: Module,
         modelsProvider: IdeModifiableModelsProvider
@@ -76,7 +78,7 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
             .firstOrNull()
             ?.data
             ?.let { findKotlinPluginVersion(it) } ?: return
-        val platformKind = when (sourceSetData.platform) {
+        val platformKind = when (kotlinSourceSet.platform) {
             KotlinPlatform.JVM -> TargetPlatformKind.Jvm[JvmTarget.fromString(
                 sourceSetData.targetCompatibility ?: ""
             ) ?: JvmTarget.DEFAULT]
@@ -90,8 +92,8 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
         val kotlinFacet = ideModule.getOrCreateFacet(modelsProvider, false)
         kotlinFacet.configureFacet(compilerVersion, coroutinesProperty, platformKind, modelsProvider)
 
-        val compilerArguments = sourceSetData.compilerArguments
-        val defaultCompilerArguments = sourceSetData.defaultCompilerArguments
+        val compilerArguments = kotlinSourceSet.compilerArguments
+        val defaultCompilerArguments = kotlinSourceSet.defaultCompilerArguments
         if (compilerArguments != null) {
             applyCompilerArgumentsToFacet(
                 compilerArguments,
@@ -101,18 +103,18 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
             )
         }
 
-        adjustClasspath(kotlinFacet, sourceSetData.dependencyClasspath)
+        adjustClasspath(kotlinFacet, kotlinSourceSet.dependencyClasspath)
 
         kotlinFacet.noVersionAutoAdvance()
 
         with(kotlinFacet.configuration.settings) {
-            sourceSetNames = sourceSetData.sourceSetIds.mapNotNull { sourceSetId ->
+            sourceSetNames = kotlinSourceSet.sourceSetIdsByName.values.mapNotNull { sourceSetId ->
                 val node = mainModuleNode.findChildModuleById(sourceSetId) ?: return@mapNotNull null
                 val data = node.data as? ModuleData ?: return@mapNotNull null
                 modelsProvider.findIdeModule(data)?.name
             }
 
-            if (sourceSetData.isTestModule) {
+            if (kotlinSourceSet.isTestModule) {
                 testOutputPath = sourceSetData.getCompileOutputPath(ExternalSystemSourceType.TEST)
                 productionOutputPath = null
             } else {
