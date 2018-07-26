@@ -60,7 +60,7 @@ class KotlinCompilationImpl(
 }
 
 class KotlinTargetJarImpl(
-    override val archiveFile: File
+    override val archiveFile: File?
 ) : KotlinTargetJar
 
 class KotlinTargetImpl(

@@ -59,7 +59,7 @@ enum class KotlinPlatform(val id: String) {
 }
 
 interface KotlinTargetJar : Serializable {
-    val archiveFile: File
+    val archiveFile: File?
 }
 
 interface KotlinTarget : Serializable {

@@ -9,10 +9,8 @@ import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
-import org.gradle.api.tasks.SourceSetOutput
-import org.gradle.api.tasks.compile.AbstractCompile
-import org.gradle.jvm.tasks.Jar
 import org.jetbrains.plugins.gradle.model.AbstractExternalDependency
 import org.jetbrains.plugins.gradle.model.ExternalDependency
 import org.jetbrains.plugins.gradle.tooling.ErrorMessageBuilder
@@ -133,8 +131,10 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         val targetClass = gradleTarget.javaClass
         val getArtifactsTaskName = targetClass.getMethodOrNull("getArtifactsTaskName") ?: return null
         val artifactsTaskName = getArtifactsTaskName(gradleTarget) as? String ?: return null
-        val jarTask = project.tasks.findByName(artifactsTaskName) as? Jar ?: return null
-        val archiveFile = jarTask.archivePath
+        val jarTask = project.tasks.findByName(artifactsTaskName) ?: return null
+        val jarTaskClass = jarTask.javaClass
+        val getArchivePath = jarTaskClass.getMethodOrNull("getArchivePath")
+        val archiveFile = getArchivePath?.invoke(jarTask) as? File?
         return KotlinTargetJarImpl(archiveFile)
     }
 
@@ -202,9 +202,16 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
     ): KotlinCompilationOutput? {
         val compilationClass = gradleCompilation.javaClass
         val getOutput = compilationClass.getMethodOrNull("getOutput") ?: return null
-        val gradleOutput = getOutput(gradleCompilation) as? SourceSetOutput ?: return null
-        val classesDir = (compileKotlinTask as? AbstractCompile)?.destinationDir
-        return KotlinCompilationOutputImpl(gradleOutput.classesDirs.files, classesDir, gradleOutput.resourcesDir)
+        val gradleOutput = getOutput(gradleCompilation) ?: return null
+        val gradleOutputClass = gradleOutput.javaClass
+        val getClassesDirs = gradleOutputClass.getMethodOrNull("getClassesDirs") ?: return null
+        val getResourcesDir = gradleOutputClass.getMethodOrNull("getResourcesDir") ?: return null
+        val compileKotlinTaskClass = compileKotlinTask.javaClass
+        val getDestinationDir = compileKotlinTaskClass.getMethodOrNull("getDestinationDir") ?: return null
+        val classesDirs = getClassesDirs(gradleOutput) as? FileCollection ?: return null
+        val resourcesDir = getResourcesDir(gradleOutput) as? File ?: return null
+        val destinationDir = getDestinationDir(compileKotlinTask) as? File
+        return KotlinCompilationOutputImpl(classesDirs.files, destinationDir, resourcesDir)
     }
 
     private fun computeSourceSetsDeferredInfo(
