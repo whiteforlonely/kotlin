@@ -72,7 +72,6 @@
         <referencesSearch implementation="org.jetbrains.kotlin.AndroidExtensionsReferenceSearchExecutor"/>
 
         <externalProjectDataService implementation="org.jetbrains.kotlin.android.configure.KotlinAndroidGradleLibraryDataService"/>
-        <externalProjectDataService implementation="org.jetbrains.kotlin.android.configure.KotlinAndroidGradleMPPModuleDataService"/>
     </extensions>
 
     <extensions defaultExtensionNs="org.jetbrains.plugins.gradle">
