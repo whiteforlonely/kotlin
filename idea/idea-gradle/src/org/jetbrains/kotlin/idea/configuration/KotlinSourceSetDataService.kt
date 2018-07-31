@@ -19,10 +19,15 @@ import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModifiableRootModel
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
 import com.intellij.openapi.roots.libraries.Library
+import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.config.CoroutineSupport
 import org.jetbrains.kotlin.config.JvmTarget
+import org.jetbrains.kotlin.config.KotlinModuleKind
 import org.jetbrains.kotlin.config.TargetPlatformKind
+import org.jetbrains.kotlin.gradle.KotlinCompilation
+import org.jetbrains.kotlin.gradle.KotlinModule
 import org.jetbrains.kotlin.gradle.KotlinPlatform
+import org.jetbrains.kotlin.gradle.KotlinSourceSet
 import org.jetbrains.kotlin.idea.facet.applyCompilerArgumentsToFacet
 import org.jetbrains.kotlin.idea.facet.configureFacet
 import org.jetbrains.kotlin.idea.facet.getOrCreateFacet
@@ -66,6 +71,13 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
         }
     }
 
+    private val KotlinModule.kind
+        get() = when (this) {
+            is KotlinCompilation -> KotlinModuleKind.COMPILATION_AND_SOURCE_SET_HOLDER
+            is KotlinSourceSet -> KotlinModuleKind.SOURCE_SET_HOLDER
+            else -> KotlinModuleKind.DEFAULT
+        }
+
     private fun configureFacet(
         sourceSetData: GradleSourceSetData,
         kotlinSourceSet: KotlinSourceSetInfo,
@@ -108,6 +120,8 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
         kotlinFacet.noVersionAutoAdvance()
 
         with(kotlinFacet.configuration.settings) {
+            kind = kotlinSourceSet.kotlinModule.kind
+
             sourceSetNames = kotlinSourceSet.sourceSetIdsByName.values.mapNotNull { sourceSetId ->
                 val node = mainModuleNode.findChildModuleById(sourceSetId) ?: return@mapNotNull null
                 val data = node.data as? ModuleData ?: return@mapNotNull null
@@ -115,10 +129,10 @@ class KotlinSourceSetDataService : AbstractProjectDataService<GradleSourceSetDat
             }
 
             if (kotlinSourceSet.isTestModule) {
-                testOutputPath = sourceSetData.getCompileOutputPath(ExternalSystemSourceType.TEST)
+                testOutputPath = (kotlinSourceSet.compilerArguments as? K2JSCompilerArguments)?.outputFile
                 productionOutputPath = null
             } else {
-                productionOutputPath = sourceSetData.getCompileOutputPath(ExternalSystemSourceType.SOURCE)
+                productionOutputPath = (kotlinSourceSet.compilerArguments as? K2JSCompilerArguments)?.outputFile
                 testOutputPath = null
             }
         }

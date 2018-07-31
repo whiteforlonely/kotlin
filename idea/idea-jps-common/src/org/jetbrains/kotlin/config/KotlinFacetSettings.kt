@@ -112,6 +112,12 @@ var CommonCompilerArguments.apiVersionView: VersionView
         autoAdvanceApiVersion = value == VersionView.LatestStable
     }
 
+enum class KotlinModuleKind {
+    DEFAULT,
+    SOURCE_SET_HOLDER,
+    COMPILATION_AND_SOURCE_SET_HOLDER
+}
+
 class KotlinFacetSettings {
     companion object {
         // Increment this when making serialization-incompatible changes to configuration data
@@ -197,6 +203,7 @@ class KotlinFacetSettings {
     var productionOutputPath: String? = null
     var testOutputPath: String? = null
 
+    var kind: KotlinModuleKind = KotlinModuleKind.DEFAULT
     var sourceSetNames: List<String> = emptyList()
 }
 

@@ -20,6 +20,7 @@ import com.intellij.util.SmartList
 import com.intellij.util.containers.MultiMap
 import com.intellij.util.text.VersionComparatorUtil
 import org.gradle.tooling.model.UnsupportedMethodException
+import org.gradle.tooling.model.idea.IdeaContentRoot
 import org.gradle.tooling.model.idea.IdeaModule
 import org.jetbrains.kotlin.cli.common.arguments.*
 import org.jetbrains.kotlin.gradle.*
@@ -52,12 +53,16 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
     }
 
     override fun populateModuleContentRoots(gradleModule: IdeaModule, ideModule: DataNode<ModuleData>) {
-        super.populateModuleContentRoots(gradleModule, ideModule)
+        if (resolverCtx.getExtraProject(gradleModule, KotlinMPPGradleModel::class.java) == null) {
+            return super.populateModuleContentRoots(gradleModule, ideModule)
+        }
         populateContentRoots(gradleModule, ideModule, resolverCtx)
     }
 
     override fun populateModuleCompileOutputSettings(gradleModule: IdeaModule, ideModule: DataNode<ModuleData>) {
-        super.populateModuleCompileOutputSettings(gradleModule, ideModule)
+        if (resolverCtx.getExtraProject(gradleModule, KotlinMPPGradleModel::class.java) == null) {
+            super.populateModuleCompileOutputSettings(gradleModule, ideModule)
+        }
 
         val mppModel = resolverCtx.getExtraProject(gradleModule, KotlinMPPGradleModel::class.java) ?: return
         val ideaOutDir = File(ideModule.data.linkedExternalProjectPath, "out")
@@ -93,7 +98,9 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
     }
 
     override fun populateModuleDependencies(gradleModule: IdeaModule, ideModule: DataNode<ModuleData>, ideProject: DataNode<ProjectData>) {
-        super.populateModuleDependencies(gradleModule, ideModule, ideProject)
+        if (resolverCtx.getExtraProject(gradleModule, KotlinMPPGradleModel::class.java) == null) {
+            super.populateModuleDependencies(gradleModule, ideModule, ideProject)
+        }
         populateModuleDependencies(gradleModule, ideProject, ideModule, resolverCtx)
     }
 
@@ -287,6 +294,18 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
                 createContentRootData(sourceSet.sourceDirs, sourceSet.sourceType, dataNode)
                 createContentRootData(sourceSet.resourceDirs, sourceSet.resourceType, dataNode)
             }
+
+            for (gradleContentRoot in gradleModule.contentRoots ?: emptySet<IdeaContentRoot?>()) {
+                if (gradleContentRoot == null) continue
+
+                val rootDirectory = gradleContentRoot.rootDirectory ?: continue
+                val ideContentRoot = ContentRootData(GradleConstants.SYSTEM_ID, rootDirectory.absolutePath).also { ideContentRoot ->
+                    (gradleContentRoot.excludeDirectories ?: emptySet()).forEach { file ->
+                        ideContentRoot.storePath(ExternalSystemSourceType.EXCLUDED, file.absolutePath)
+                    }
+                }
+                ideModule.createChild(ProjectKeys.CONTENT_ROOT, ideContentRoot)
+            }
         }
 
         fun populateModuleDependencies(
@@ -301,7 +320,14 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
             val processedModuleIds = HashSet<String>()
             processCompilations(gradleModule, mppModel, ideModule, resolverCtx) { dataNode, compilation ->
                 if (processedModuleIds.add(getKotlinModuleId(gradleModule, compilation, resolverCtx))) {
-                    buildDependencies(resolverCtx, sourceSetMap, artifactsMap, dataNode, compilation.dependencies, ideProject)
+                    buildDependencies(
+                        resolverCtx,
+                        sourceSetMap,
+                        artifactsMap,
+                        dataNode,
+                        preprocessDependencies(compilation, ideProject),
+                        ideProject
+                    )
                     for (sourceSet in compilation.sourceSets) {
                         if (sourceSet.fullName() == compilation.fullName()) continue
                         val usedModuleId = getKotlinModuleId(gradleModule, sourceSet, resolverCtx)
@@ -318,8 +344,50 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
                     }
                 }
                 if (processedModuleIds.add(getKotlinModuleId(gradleModule, sourceSet, resolverCtx))) {
-                    buildDependencies(resolverCtx, sourceSetMap, artifactsMap, dataNode, sourceSet.dependencies, ideProject)
+                    buildDependencies(
+                        resolverCtx,
+                        sourceSetMap,
+                        artifactsMap,
+                        dataNode,
+                        preprocessDependencies(sourceSet, ideProject),
+                        ideProject
+                    )
                 }
+            }
+        }
+
+        private fun preprocessDependencies(
+            kotlinModule: KotlinModule,
+            ideProject: DataNode<ProjectData>
+        ): List<ExternalDependency> {
+            return kotlinModule.dependencies
+                .groupBy { it.id }
+                .mapValues { it.value.firstOrNull { it.scope == "COMPILE" } ?: it.value.lastOrNull() }
+                .values
+                .filterNotNull()
+                .map { adjustDependency(it, ideProject) }
+        }
+
+        private fun adjustDependency(
+            dependency: ExternalDependency,
+            ideProject: DataNode<ProjectData>
+        ): ExternalDependency {
+            if (dependency !is ExternalProjectDependency) return dependency
+            val projectPath = dependency.projectPath
+            val classifier = dependency.classifier ?: return dependency
+            val targetModuleNode = ExternalSystemApiUtil.findFirstRecursively(ideProject) {
+                (it.data as? ModuleData)?.id == projectPath
+            } ?: return dependency
+            val targetCompilation = ExternalSystemApiUtil
+                .getChildren(targetModuleNode, GradleSourceSetData.KEY)
+                .mapNotNull { sourceSetNode ->
+                    sourceSetNode.kotlinSourceSet?.kotlinModule as? KotlinCompilation
+                }
+                .firstOrNull {
+                    it.name == KotlinCompilation.MAIN_COMPILATION_NAME && it.target.disambiguationClassifier == classifier
+                } ?: return dependency
+            return DefaultExternalProjectDependency(dependency).also {
+                it.configurationName = targetCompilation.fullName()
             }
         }
 
@@ -479,6 +547,9 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
                 it.moduleId = getKotlinModuleId(gradleModule, sourceSet, resolverCtx)
                 it.platform = sourceSet.platform
                 it.isTestModule = sourceSet.isTestModule
+                it.compilerArguments = createCompilerArguments(emptyList(), sourceSet.platform).also {
+                    it.multiPlatform = true
+                }
             }
         }
 
@@ -491,7 +562,9 @@ open class KotlinMPPGradleProjectResolver : AbstractProjectResolverExtension() {
                 it.moduleId = getKotlinModuleId(gradleModule, compilation, resolverCtx)
                 it.platform = compilation.platform
                 it.isTestModule = compilation.isTestModule
-                it.compilerArguments = createCompilerArguments(compilation.arguments.currentArguments, compilation.platform)
+                it.compilerArguments = createCompilerArguments(compilation.arguments.currentArguments, compilation.platform).also {
+                    it.multiPlatform = true
+                }
                 it.dependencyClasspath = compilation.dependencyClasspath
                 it.defaultCompilerArguments = createCompilerArguments(compilation.arguments.defaultArguments, compilation.platform)
                 it.sourceSetIdsByName = compilation.sourceSets

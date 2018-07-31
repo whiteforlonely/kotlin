@@ -9,10 +9,14 @@ import org.gradle.api.Named
 import org.gradle.api.NamedDomainObjectContainer
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.artifacts.Dependency
+import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.SourceDirectorySet
 import org.jetbrains.plugins.gradle.model.AbstractExternalDependency
+import org.jetbrains.plugins.gradle.model.DefaultExternalProjectDependency
 import org.jetbrains.plugins.gradle.model.ExternalDependency
+import org.jetbrains.plugins.gradle.model.ExternalProjectDependency
 import org.jetbrains.plugins.gradle.tooling.ErrorMessageBuilder
 import org.jetbrains.plugins.gradle.tooling.ModelBuilderService
 import org.jetbrains.plugins.gradle.tooling.util.DependencyResolver
@@ -86,9 +90,25 @@ class KotlinMPPGradleModelBuilder : ModelBuilderService {
         val configurationName = getConfigurationName(gradleCompilation) as? String ?: return emptyList()
         val configuration = project.configurations.findByName(configurationName) ?: return emptyList()
         if (!configuration.isCanBeResolved) return emptyList()
-        return dependencyResolver.resolveDependencies(configuration).apply {
-            forEach<ExternalDependency?> { (it as? AbstractExternalDependency)?.scope = scope }
-        }
+        val artifactsByProjectPath = configuration
+            .resolvedConfiguration
+            .lenientConfiguration
+            .firstLevelModuleDependencies
+            .flatMap { it.moduleArtifacts }
+            .filter { it.id.componentIdentifier is ProjectComponentIdentifier }
+            .groupBy { (it.id.componentIdentifier as ProjectComponentIdentifier).projectPath }
+        return dependencyResolver.resolveDependencies(configuration)
+            .apply {
+                forEach<ExternalDependency?> { (it as? AbstractExternalDependency)?.scope = scope }
+            }
+            .map {
+                if (it !is ExternalProjectDependency || it.configurationName != Dependency.DEFAULT_CONFIGURATION) return@map it
+                val artifacts = artifactsByProjectPath[it.projectPath] ?: return@map it
+                val classifier = artifacts.mapTo(LinkedHashSet()) { it.classifier }.singleOrNull() ?: return@map it
+                DefaultExternalProjectDependency(it).apply {
+                    this.classifier = classifier
+                }
+            }
     }
 
     private fun buildTargets(
