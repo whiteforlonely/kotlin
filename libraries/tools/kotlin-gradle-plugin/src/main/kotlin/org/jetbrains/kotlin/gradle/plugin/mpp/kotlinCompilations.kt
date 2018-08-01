@@ -35,10 +35,8 @@ internal fun KotlinCompilation.composeName(prefix: String? = null, suffix: Strin
     return lowerCamelCaseName(prefix, targetNamePart, compilationNamePart, suffix)
 }
 
-internal val KotlinCompilation.fullName: String
-    get() = fullCompilationName(target, compilationName)
-
-internal fun fullCompilationName(target: KotlinTarget, simpleName: String) = lowerCamelCaseName(target.disambiguationClassifier, simpleName)
+internal val KotlinCompilation.defaultSourceSetName: String
+    get() = lowerCamelCaseName(target.disambiguationClassifier, compilationName)
 
 internal class DefaultKotlinDependencyHandler(
     val parent: HasKotlinDependencies,
