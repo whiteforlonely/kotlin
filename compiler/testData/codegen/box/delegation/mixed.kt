@@ -1,3 +1,4 @@
+// TARGET_BACKEND: JVM
 // IGNORE_BACKEND: JVM_IR
 // FILE: Base.java
 
