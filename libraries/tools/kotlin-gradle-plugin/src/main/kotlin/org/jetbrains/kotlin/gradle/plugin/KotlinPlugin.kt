@@ -430,9 +430,7 @@ internal abstract class AbstractKotlinPlugin(
                     project.configurations.getByName(kotlinTarget.runtimeElementsConfigurationName).usesPlatformOf(kotlinTarget)
 
                     kotlinTarget.compilations.all { compilation ->
-                        compilation.relatedConfigurationNames.forEach { configurationName ->
-                            project.configurations.findByName(configurationName)?.usesPlatformOf(kotlinTarget)
-                        }
+                        KotlinTargetConfigurator.defineConfigurationsForCompilation(compilation, kotlinTarget, project.configurations)
                     }
                 }
             }
