@@ -384,7 +384,7 @@ internal fun Project.usageByName(usageName: String): Usage =
         // `project.objects` is an API introduced in Gradle 4.0
         project.objects.named(Usage::class.java, usageName)
     } else {
-        val usagesClass = Class.forName("org.gradle.api.internal.attributes")
+        val usagesClass = Class.forName("org.gradle.api.internal.attributes.Usages")
         val usagesMethod = usagesClass.getMethod("usage", String::class.java)
         usagesMethod(null, usageName) as Usage
     }
