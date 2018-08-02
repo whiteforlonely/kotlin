@@ -24,6 +24,7 @@ import org.gradle.api.tasks.SourceSetOutput
 import org.gradle.util.ConfigureUtil
 import org.jetbrains.kotlin.gradle.plugin.*
 import org.jetbrains.kotlin.gradle.plugin.source.KotlinSourceSet
+import org.jetbrains.kotlin.gradle.plugin.sources.getSourceSetHierarchy
 import org.jetbrains.kotlin.gradle.tasks.AbstractKotlinCompile
 import org.jetbrains.kotlin.gradle.utils.addExtendsFromRelation
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
@@ -69,17 +70,19 @@ abstract class AbstractKotlinCompilation(
         if (kotlinSourceSets.add(sourceSet)) {
             with(target.project) {
                 whenEvaluated {
-                    (target.project.tasks.getByName(compileKotlinTaskName) as AbstractKotlinCompile<*>).source(sourceSet.kotlin)
-                }
+                    sourceSet.getSourceSetHierarchy().forEach { sourceSet ->
+                        (target.project.tasks.getByName(compileKotlinTaskName) as AbstractKotlinCompile<*>).source(sourceSet.kotlin)
 
-                // Use `forced = false` since `api`, `implementation`, and `compileOnly` may be missing in some cases like
-                // old Java & Android projects:
-                addExtendsFromRelation(apiConfigurationName, sourceSet.apiConfigurationName, forced = false)
-                addExtendsFromRelation(implementationConfigurationName, sourceSet.implementationConfigurationName, forced = false)
-                addExtendsFromRelation(compileOnlyConfigurationName, sourceSet.compileOnlyConfigurationName, forced = false)
+                        // Use `forced = false` since `api`, `implementation`, and `compileOnly` may be missing in some cases like
+                        // old Java & Android projects:
+                        addExtendsFromRelation(apiConfigurationName, sourceSet.apiConfigurationName, forced = false)
+                        addExtendsFromRelation(implementationConfigurationName, sourceSet.implementationConfigurationName, forced = false)
+                        addExtendsFromRelation(compileOnlyConfigurationName, sourceSet.compileOnlyConfigurationName, forced = false)
 
-                if (this is KotlinCompilationToRunnableFiles) {
-                    addExtendsFromRelation(runtimeOnlyConfigurationName, sourceSet.runtimeOnlyConfigurationName)
+                        if (this is KotlinCompilationToRunnableFiles) {
+                            addExtendsFromRelation(runtimeOnlyConfigurationName, sourceSet.runtimeOnlyConfigurationName, forced = false)
+                        }
+                    }
                 }
             }
         }

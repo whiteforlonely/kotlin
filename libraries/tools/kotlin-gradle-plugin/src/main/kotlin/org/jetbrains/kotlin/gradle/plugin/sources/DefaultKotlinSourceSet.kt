@@ -15,7 +15,6 @@ import org.gradle.util.ConfigureUtil
 import org.jetbrains.kotlin.gradle.plugin.KotlinDependencyHandler
 import org.jetbrains.kotlin.gradle.plugin.mpp.DefaultKotlinDependencyHandler
 import org.jetbrains.kotlin.gradle.plugin.source.KotlinSourceSet
-import org.jetbrains.kotlin.gradle.utils.addExtendsFromRelation
 import org.jetbrains.kotlin.gradle.utils.lowerCamelCaseName
 import java.lang.reflect.Constructor
 import java.util.*
@@ -59,21 +58,6 @@ class DefaultKotlinSourceSet(
 
         // Fail-fast approach: check on each new added edge and report a circular dependency at once when the edge is added.
         checkForCircularDependencies()
-
-        val configurationsToConnectGetters = listOf(
-            KotlinSourceSet::apiConfigurationName,
-            KotlinSourceSet::implementationConfigurationName,
-            KotlinSourceSet::compileOnlyConfigurationName,
-            KotlinSourceSet::runtimeOnlyConfigurationName
-        )
-
-        (configurationsToConnectGetters.map { it(this@DefaultKotlinSourceSet) } zip (configurationsToConnectGetters.map { it(other) }))
-            .forEach { (thisConfiguration, otherConfiguration) ->
-                project.addExtendsFromRelation(thisConfiguration, otherConfiguration)
-            }
-
-        kotlin.source(other.kotlin)
-        resources.source(other.resources)
     }
 
     private val dependsOnSourceSetsImpl = mutableSetOf<KotlinSourceSet>()
@@ -83,7 +67,6 @@ class DefaultKotlinSourceSet(
 
     override fun toString(): String = "source set $name"
 }
-
 
 private fun KotlinSourceSet.checkForCircularDependencies(): Unit {
     // If adding an edge creates a cycle, than the source node of the edge belongs to the cycle, so run DFS from that node
@@ -133,6 +116,20 @@ private val createDefaultSourceDirectorySet: (name: String?, resolver: FileResol
         return@run { name, resolver -> alternativeConstructor.newInstance(name, resolver, defaultFileTreeFactory) }
     }
 }
+
+internal fun KotlinSourceSet.getSourceSetHierarchy(): Set<KotlinSourceSet> {
+    val result = mutableSetOf<KotlinSourceSet>()
+
+    fun processSourceSet(sourceSet: KotlinSourceSet) {
+        if (result.add(sourceSet)) {
+            sourceSet.dependsOn.forEach { processSourceSet(it) }
+        }
+    }
+
+    processSourceSet(this)
+    return result
+}
+
 
 private fun <T> Class<T>.constructorOrNull(vararg parameterTypes: Class<*>): Constructor<T>? =
     try {
