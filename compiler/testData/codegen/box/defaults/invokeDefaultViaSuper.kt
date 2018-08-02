@@ -1,3 +1,4 @@
+// IGNORE_BACKEND: JVM_IR
 // FILE: Test.java
 
 public interface Test {

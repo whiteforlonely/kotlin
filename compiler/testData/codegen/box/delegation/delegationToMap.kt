@@ -1,3 +1,4 @@
+// IGNORE_BACKEND: JVM_IR
 // FULL_JDK
 
 class MapWithBadDefaults : HashMap<String, String>() {
