@@ -419,19 +419,16 @@ internal abstract class AbstractKotlinPlugin(
         private fun configureAttributes(
             kotlinTarget: KotlinWithJavaTarget
         ) {
+            val project = kotlinTarget.project
+
             // Don't set the attributes for common module; otherwise their 'common' platform won't be compatible with the one in
             // platform-specific modules
             if (kotlinTarget.platformType != KotlinPlatformType.common) {
-                kotlinTarget.project.afterEvaluate { project ->
-                    // Register the attribute; this is required for older Gradle versions
-                    project.dependencies.attributesSchema.attribute(KotlinPlatformType.attribute)
-
-                    project.configurations.getByName(kotlinTarget.apiElementsConfigurationName).usesPlatformOf(kotlinTarget)
-                    project.configurations.getByName(kotlinTarget.runtimeElementsConfigurationName).usesPlatformOf(kotlinTarget)
-
-                    kotlinTarget.compilations.all { compilation ->
-                        KotlinTargetConfigurator.defineConfigurationsForCompilation(compilation, kotlinTarget, project.configurations)
-                    }
+                project.dependencies.attributesSchema.attribute(KotlinPlatformType.attribute)
+                project.configurations.getByName(kotlinTarget.apiElementsConfigurationName).usesPlatformOf(kotlinTarget)
+                project.configurations.getByName(kotlinTarget.runtimeElementsConfigurationName).usesPlatformOf(kotlinTarget)
+                kotlinTarget.compilations.all { compilation ->
+                    KotlinTargetConfigurator.defineConfigurationsForCompilation(compilation, kotlinTarget, project.configurations)
                 }
             }
         }
